@@ -1,5 +1,6 @@
 from keras import layers, models, Model
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 """class AtariGRU(layers.Layer):
     def __init__(self, units, time_steps):
@@ -33,15 +34,30 @@ class AtariGRU(layers.Layer):
         self.rnn = layers.GRU(units=units, return_sequences=True, return_state=True)
         
     
-    def call(self, inputs, cell_states=None):
+    def call(self, inputs, dones, cell_states, training=True):
         #shape: (num_envs, batch_size, units)
+        #dones: (num_envs, batch_size)
+
         if cell_states is None:
             cell_states = self.initial_cell
             num_envs = inputs.shape[0]
             cell_states = tf.expand_dims(cell_states, axis=0)
             cell_states = tf.repeat(cell_states, num_envs, axis=0)
-        sequences, cell_states = self.rnn(inputs=inputs, initial_state=cell_states)
+        
+        inputs = tf.split(inputs, inputs.shape[1], axis=1)
+        sequences = []
+        for x, done in zip(inputs, tf.transpose(dones)):
+            indices = tf.where(done)
+            if len(indices):
+                initial_cells = tf.expand_dims(self.initial_cell, axis=0)
+                initial_cells = tf.repeat(initial_cells, len(indices), axis=0)
+                cell_states = tf.tensor_scatter_nd_update(cell_states, indices, initial_cells)
+            hidden_state, cell_states = self.rnn(inputs=x, initial_state=cell_states, training=training)
+            
+            sequences.append(hidden_state)
+        sequences = tf.concat(sequences, axis=1)
         return sequences, cell_states
+
 
 
 class AtariNetwork(Model):
@@ -56,13 +72,13 @@ class AtariNetwork(Model):
         self.cnn = models.Sequential([self.c1, self.c2, self.c3, self.fc1, self.fc2, self.layer_norm])
         self.gru = AtariGRU(units=800)
         self.concatenate = layers.Concatenate(axis=2)
-    def call(self, inputs, cell_states=None, training=True):
+    def call(self, inputs, dones, cell_states=None, training=True):
         #inputs must be of shape [num_envs, batch_size, observation_spec]  
         num_envs, batch_size = inputs.shape[:2]
         inputs = tf.reshape(inputs, shape=[num_envs*batch_size] + inputs.shape[2:])            
         x = self.cnn(inputs, training=training)
         x = tf.reshape(x, shape=(num_envs, batch_size, x.shape[-1]))
-        sequences, cell_states = self.gru(x, cell_states=cell_states, training=training)
+        sequences, cell_states = self.gru(x, dones, cell_states=cell_states, training=training)
         x = self.concatenate([x, sequences], training=training)
         return x, cell_states
 
@@ -70,11 +86,16 @@ class AtariActorCriticNetwork(Model):
     def __init__(self, encoder, n_actions):
         super().__init__()
         self.encoder = encoder
-        self.actor = layers.Dense(units=n_actions, activation='softmax')
+        self.actor = layers.Dense(units=n_actions)
         self.critic = layers.Dense(units=1)
 
-    def call(self, inputs, cell_states=None, training=True):
-        x, new_cell_states = self.encoder(inputs, cell_states=cell_states, training=training)
-        probs = self.actor(x, training=training)
+    def call(self, inputs, dones, cell_states=None, action=None, training=True):
+        x, new_cell_states = self.encoder(inputs, dones=dones, cell_states=cell_states, training=training)
+        logits = self.actor(x, training=training)
         values = self.critic(x, training=training)
-        return probs, values, new_cell_states
+        values = tf.squeeze(values, axis=2)
+
+        distribution = tfp.distributions.Categorical(logits=logits, dtype=tf.int64)
+        if action is None:
+            action = distribution.sample()
+        return action, distribution.log_prob(action), values, distribution.entropy(), new_cell_states, 
