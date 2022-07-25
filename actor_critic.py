@@ -1,37 +1,17 @@
-from keras import layers, models, Model
+
+
 import tensorflow as tf
 import tensorflow_probability as tfp
+import numpy as np
+tf.random.set_seed(42)
+np.random.seed(42)
 
-"""class AtariGRU(layers.Layer):
-    def __init__(self, units, time_steps):
-        super().__init__()
-        self.time_steps = time_steps
-        self.n_hidden_states = int(1.5*time_steps)
-        self.steps = 0
-        self.rnn = layers.GRU(units=units, return_sequences=True, stateful=True)
-    
-    def call(self, inputs):
-        #shape: (1, time_steps, units)
-        time_steps = inputs.shape[1]
-        remaining_steps = self.n_hidden_states - self.steps
-
-        if remaining_steps < time_steps:
-            remaining_sequences = self.rnn(inputs[:,:remaining_steps,:])
-            self.rnn.reset_states()
-            sequences = self.rnn(inputs[:, remaining_steps:, :])
-            sequences = tf.concat([remaining_sequences, sequences], axis = 1)            
-        else:
-            sequences = self.rnn(inputs)
-
-        self.steps = (self.steps + time_steps) % self.n_hidden_states
-        return sequences"""
-
-class AtariGRU(layers.Layer):
+class AtariGRU(tf.keras.layers.Layer):
     def __init__(self, units):
         super().__init__()
         self.steps = 0
         self.initial_cell = tf.zeros(shape=(units))
-        self.rnn = layers.GRU(units=units, return_sequences=True, return_state=True)
+        self.rnn = tf.keras.layers.GRU(units=units, return_sequences=True, return_state=True)
         
     
     def call(self, inputs, dones, cell_states, training=True):
@@ -48,6 +28,7 @@ class AtariGRU(layers.Layer):
         sequences = []
         for x, done in zip(inputs, tf.transpose(dones)):
             indices = tf.where(done)
+            #print(cell_states[0][:4])
             if len(indices):
                 initial_cells = tf.expand_dims(self.initial_cell, axis=0)
                 initial_cells = tf.repeat(initial_cells, len(indices), axis=0)
@@ -58,44 +39,96 @@ class AtariGRU(layers.Layer):
         sequences = tf.concat(sequences, axis=1)
         return sequences, cell_states
 
-
-
-class AtariNetwork(Model):
+class AtariNetwork(tf.keras.Model):
     def __init__(self):
         super().__init__()
-        self.c1 = layers.Conv2D(filters=64, kernel_size=8, strides=4, activation='relu', input_shape=(105, 80, 12))
-        self.c2 = layers.Conv2D(filters=128, kernel_size=4, strides=2, activation='relu', input_shape=(25, 19, 128))
-        self.c3 = layers.Conv2D(filters=128, kernel_size=3, strides=1, activation='relu', input_shape=(11, 8, 128))
-        self.fc1 = layers.Flatten()
-        self.fc2 = layers.Dense(800, activation='relu')
-        self.layer_norm = layers.LayerNormalization()
-        self.cnn = models.Sequential([self.c1, self.c2, self.c3, self.fc1, self.fc2, self.layer_norm])
+        self.c1 = tf.keras.layers.Conv2D(filters=64, kernel_size=8, strides=4, activation='relu')
+        self.c2 = tf.keras.layers.Conv2D(filters=128, kernel_size=4, strides=2, activation='relu')
+        self.c3 = tf.keras.layers.Conv2D(filters=128, kernel_size=3, strides=1, activation='relu')
+        self.fc1 = tf.keras.layers.Flatten()
+        self.fc2 = tf.keras.layers.Dense(800, activation='relu')
+        self.layer_norm = tf.keras.layers.LayerNormalization()
+        self.cnn = tf.keras.models.Sequential([self.c1, self.c2, self.c3, self.fc1, self.fc2])
+        self.cnn = tf.keras.layers.TimeDistributed(self.cnn)
         self.gru = AtariGRU(units=800)
-        self.concatenate = layers.Concatenate(axis=2)
+        self.concatenate = tf.keras.layers.Concatenate(axis=2)
     def call(self, inputs, dones, cell_states=None, training=True):
         #inputs must be of shape [num_envs, batch_size, observation_spec]  
         num_envs, batch_size = inputs.shape[:2]
-        inputs = tf.reshape(inputs, shape=[num_envs*batch_size] + inputs.shape[2:])            
+        #inputs = tf.reshape(inputs, shape=[num_envs*batch_size] + inputs.shape[2:])    
         x = self.cnn(inputs, training=training)
-        x = tf.reshape(x, shape=(num_envs, batch_size, x.shape[-1]))
+
+        #x = tf.reshape(x, shape=(num_envs, batch_size, x.shape[-1]))
         sequences, cell_states = self.gru(x, dones, cell_states=cell_states, training=training)
         x = self.concatenate([x, sequences], training=training)
         return x, cell_states
 
-class AtariActorCriticNetwork(Model):
-    def __init__(self, encoder, n_actions):
+class AtariNetwork(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.c1 = tf.keras.layers.Conv2D(filters=32, kernel_size=8, strides=4, activation='tanh')
+        self.c2 = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, activation='tanh')
+        self.c3 = tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=1, activation='tanh')
+        self.fc1 = tf.keras.layers.Flatten()
+        self.fc2 = tf.keras.layers.Dense(512, activation='relu')
+        self.layer_norm = tf.keras.layers.LayerNormalization()
+        self.cnn = tf.keras.models.Sequential([self.c1, self.c2, self.c3, self.fc1, self.fc2])
+        self.cnn = tf.keras.layers.TimeDistributed(self.cnn)
+        #self.gru = AtariGRU(units=800)
+        #self.concatenate = layers.Concatenate(axis=2)
+    def call(self, inputs, dones, cell_states=None, training=True):
+        #inputs must be of shape [num_envs, batch_size, observation_spec]  
+        num_envs, batch_size = inputs.shape[:2]
+        #inputs = tf.reshape(inputs, shape=[num_envs*batch_size] + inputs.shape[2:])    
+        x = self.cnn(inputs, training=training)
+
+        #x = tf.reshape(x, shape=(num_envs, batch_size, x.shape[-1]))
+        #sequences, cell_states = self.gru(x, dones, cell_states=cell_states, training=training)
+        #x = self.concatenate([x, sequences], training=training)
+        return x, cell_states
+
+class AtariActorCriticNetwork(tf.keras.Model):
+    def __init__(self, encoder, encoder_value, n_actions):
         super().__init__()
         self.encoder = encoder
-        self.actor = layers.Dense(units=n_actions)
-        self.critic = layers.Dense(units=1)
+        self.encoder_value = encoder_value
+        self.actor = tf.keras.layers.Dense(units=n_actions)
+        self.critic = tf.keras.layers.Dense(units=1)
 
     def call(self, inputs, dones, cell_states=None, action=None, training=True):
+        inputs = tf.cast(inputs, tf.float32) / 255.0
         x, new_cell_states = self.encoder(inputs, dones=dones, cell_states=cell_states, training=training)
         logits = self.actor(x, training=training)
+
+        x, new_cell_states = self.encoder_value(inputs, dones=dones, cell_states=cell_states, training=training)
         values = self.critic(x, training=training)
         values = tf.squeeze(values, axis=2)
 
         distribution = tfp.distributions.Categorical(logits=logits, dtype=tf.int64)
         if action is None:
             action = distribution.sample()
-        return action, distribution.log_prob(action), values, distribution.entropy(), new_cell_states, 
+        return action, distribution.log_prob(action), values, distribution.entropy(), new_cell_states
+
+"""encoder = AtariNetwork()
+net = AtariActorCriticNetwork(encoder, 18, 2, 10)
+memory = []
+
+a = tf.random.uniform(shape=(2, 10, 105, 80, 12), minval=0, maxval=256)
+#a = tf.cast(a, dtype=tf.uint8)
+dones = tf.zeros(shape=(2, 10))
+net(a, dones, memory, training=False)
+
+to_inspect = memory[0]
+print(to_inspect[:, 0])
+memory.clear()
+
+b = tf.split(a, 10, axis=1)
+
+dones = tf.zeros(shape=(2, 10))
+cell_states = None
+for c in b:
+    _,_,_,_, cell_states = net(c, dones, memory, cell_states=cell_states, training=False)
+    print(memory[0][:, 0])
+    print(tf.reduce_all(tf.math.equal(memory[0][:, 0], to_inspect[:, 0])))
+    break"""
+

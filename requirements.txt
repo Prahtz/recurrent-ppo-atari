@@ -3,3 +3,6 @@ tensorflow==2.9.1
 opencv-python==4.6.0.66
 ale-py==0.7.5
 autorom[accept-rom-license]==0.4.2
+wandb==0.12.21
+tensorflow-probability==0.17.0
+yacs==0.1.8

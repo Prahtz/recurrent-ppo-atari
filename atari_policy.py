@@ -21,14 +21,13 @@ class AtariPolicy(TFPolicy):
         observations = tf.expand_dims(observations, axis=1)
 
         if type(policy_state) is tuple:
-            print('TUPLEEE')
             policy_state = None
 
         dones = tf.expand_dims(tf.math.equal(time_step.step_type, StepType.LAST), axis=1)
+        dones = tf.cast(dones, tf.float32)
 
         #probs, values, new_policy_state = self.actor_critic_network(observations, dones, cell_states=policy_state, training=False)
         actions, log_probs, values, _, new_policy_state = self.actor_critic_network(observations, dones, cell_states=policy_state, training=False)
-
         log_probs = tf.squeeze(log_probs, axis=1)
         values = tf.squeeze(values, axis=1)
         actions = tf.squeeze(actions, axis=1)
