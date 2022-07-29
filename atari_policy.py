@@ -20,9 +20,6 @@ class AtariPolicy(TFPolicy):
         observations = time_step.observation
         observations = tf.expand_dims(observations, axis=1)
 
-        if type(policy_state) is tuple:
-            policy_state = None
-
         dones = tf.expand_dims(tf.math.equal(time_step.step_type, StepType.LAST), axis=1)
         dones = tf.cast(dones, tf.float32)
 

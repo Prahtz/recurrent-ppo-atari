@@ -1,7 +1,9 @@
 env:
-  max_time_steps: 500000
+  max_time_steps: 10000000
 model:
-  rnn_units: 800
+  memory_size: 16
+  rnn_units: 64
+  share_params: false
   use_rnn: false
 ppo:
   annealing: true
@@ -14,4 +16,4 @@ ppo:
   num_actors: 8
   num_epochs: 3
   num_minibatch: 4
-  vf_coeff: 1
+  vf_coeff: 1.0
