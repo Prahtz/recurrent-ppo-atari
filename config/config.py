@@ -19,6 +19,7 @@ cfg.ppo.num_minibatch = 4
 cfg.ppo.annealing = True
 
 cfg.model = CN()
+cfg.model.name = "default"
 cfg.model.share_params = False
 cfg.model.use_rnn = False
 cfg.model.rnn_units = 64

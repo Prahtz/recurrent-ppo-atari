@@ -2,6 +2,7 @@ env:
   max_time_steps: 10000000
 model:
   memory_size: 16
+  name: default
   rnn_units: 64
   share_params: false
   use_rnn: false

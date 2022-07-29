@@ -55,6 +55,7 @@ def main(args):
     units = cfg.model.rnn_units
     use_rnn = cfg.model.use_rnn
     memory_size = cfg.model.memory_size
+    model_name = cfg.model.name
 
     n_collections = max_time_steps // (num_workers*horizon)
     
@@ -128,7 +129,8 @@ def main(args):
                 use_rnn=use_rnn,
                 render=render)
     
-    policy.actor_critic_network.save_weights(f'models/{game_name}.h5')
+    model_path = game_name + '_' + model_name
+    policy.actor_critic_network.save_weights(f'models/{model_path}.h5')
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
