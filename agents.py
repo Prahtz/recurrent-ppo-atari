@@ -39,15 +39,15 @@ class PPOAgent:
         return [[ids[j][i] for j in range(self.num_workers)] for i in range(num_minibatch)]
 
     def ppo_clip_loss(self, advantages, old_logprobs, logprobs, clip_range):
-        old_logprobs = tf.stop_gradient(old_logprobs)
+        #old_logprobs = tf.stop_gradient(old_logprobs)
         prob_ratio = tf.exp(logprobs - old_logprobs)
-        advantages = tf.stop_gradient(advantages)
+        #advantages = tf.stop_gradient(advantages)
         loss = tf.maximum(-advantages * prob_ratio, -advantages * tf.clip_by_value(prob_ratio, 1 - clip_range, 1 + clip_range))
         loss = tf.reduce_mean(loss, axis=None)
         return loss
 
     def value_function_loss(self, values, returns):
-        returns = tf.stop_gradient(returns)
+        #returns = tf.stop_gradient(returns)
         return tf.reduce_mean((values - returns)**2, axis=None)
 
     def entropy_loss(self, entropy):
@@ -73,25 +73,27 @@ class PPOAgent:
         self.memory.clear()
         return experiences
     
-    def recompute_cell_states(self, observations, dones):
-        memory_size = self.policy.actor_critic_network.memory_size
+    def recompute_cell_states(self, observations, dones, actions, last_policy_state):
+        if self.policy.actor_critic_network.shared_params:
+            steps = last_policy_state[1]
+        else:
+            steps = last_policy_state[0][1]
+
         cell_states = []
         for i in range(self.num_workers):
-            j = self.horizon - 1
-            while dones[i][j] == 0 and j >= self.horizon - memory_size:
-                j -= 1
-            j+=1
-            
-            if j == self.horizon:
+            if steps[i] == 0:
                 new_cell_states = self.policy.get_initial_state(1)
                 cell_states.append(new_cell_states)
             else:
+                j = self.horizon - steps[i].numpy().item()
                 worker_obs = tf.expand_dims(observations[i, j:], axis=0)
                 worker_dones = tf.expand_dims(dones[i, j:], axis=0)
-                _, _, _, _, new_cell_states = self.policy.actor_critic_network(worker_obs, 
-                                                                                worker_dones,
-                                                                                cell_states=self.policy.get_initial_state(1),
-                                                                                training=False)
+                worker_acts = tf.expand_dims(actions[i, j:], axis=0)
+                _, _, _, _, new_cell_states = self.policy.actor_critic_network(inputs=worker_obs, 
+                                                                               dones=worker_dones, 
+                                                                               cell_states=self.policy.get_initial_state(1), 
+                                                                               action=worker_acts, 
+                                                                               training=True)
                 cell_states.append(new_cell_states)
         
         if self.policy.actor_critic_network.shared_params:
@@ -115,11 +117,10 @@ class PPOAgent:
             print(f'episodic_return: {episodic_return}')
             for t in episodic_return.keys():
                 wandb.log({'step': t + collect_n*self.horizon, 'episodic_return':  episodic_return[t]})
-            if render and collect_n % 100 == 0:
+            if render and collect_n % 1 == 0:
                 utils.render_obs(experiences['observations'])
 
             advantages = self.compute_advantages(discount, gae_parameter, experiences['rewards'], experiences['values'], experiences['dones'])
-            #advantages = tf.stop_gradient(advantages)
             returns = advantages + experiences['values'][:, :-1]
             
             minibatch_ids = self.compute_minibatch_ids(num_minibatch, use_rnn=use_rnn)
@@ -132,14 +133,13 @@ class PPOAgent:
                     sample_probs = tf.gather(experiences['probs'], idx, batch_dims=1)
                     sample_advantages = tf.gather(advantages, idx, batch_dims=1)
                     sample_returns = tf.gather(returns, idx, batch_dims=1)
+                    sample_advantages = (sample_advantages - tf.reduce_mean(sample_advantages, axis=None)) / (tf.math.reduce_std(sample_advantages, axis=None) + 1e-8)
                     with tf.GradientTape() as tape:
                         _, new_probs, new_values, entropy, _ = self.policy.actor_critic_network(sample_observations, 
                                                                                                 sample_dones, 
                                                                                                 sample_policy_state, 
                                                                                                 sample_actions, 
                                                                                                 training=True)
-                        
-                        sample_advantages = (sample_advantages - tf.reduce_mean(sample_advantages, axis=None)) / (tf.math.reduce_std(sample_advantages, axis=None) + 1e-8)
 
                         ppo_l = self.ppo_clip_loss(sample_advantages, sample_probs, new_probs, clipping_fn())
                         value_function_l = self.value_function_loss(new_values, sample_returns)
@@ -148,9 +148,9 @@ class PPOAgent:
                         
                         print(f'total_loss: {loss} - ppo_loss: {ppo_l} - value_loss: {vf_coeff*value_function_l} - entropy: {entropy_coeff*entropy_l}')
                         wandb.log({'ppo_loss': ppo_l, 'vf_loss': value_function_l, 'entropy_loss': entropy_l})
-                        
+                    
                     grads = tape.gradient(loss, self.policy.actor_critic_network.trainable_weights)
                     optimizer.apply_gradients(zip(grads, self.policy.actor_critic_network.trainable_weights))
             
             if use_rnn:
-                new_policy_state = self.recompute_cell_states(experiences['observations'], experiences['dones'])
+                new_policy_state = self.recompute_cell_states(experiences['observations'], experiences['dones'], experiences['actions'], experiences['last_policy_state'])
