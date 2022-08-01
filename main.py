@@ -69,6 +69,7 @@ def main(args):
         "vf_coeff": vf_coeff,
         "use_rnn": use_rnn,
         "rnn_units": units,
+        "conv_net": cfg.model.conv_net,
         "share_params": share_params,
         "memory_size": memory_size
     }

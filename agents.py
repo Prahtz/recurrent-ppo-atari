@@ -39,22 +39,18 @@ class PPOAgent:
         return [[ids[j][i] for j in range(self.num_workers)] for i in range(num_minibatch)]
 
     def ppo_clip_loss(self, advantages, old_logprobs, logprobs, clip_range):
-        #old_logprobs = tf.stop_gradient(old_logprobs)
         prob_ratio = tf.exp(logprobs - old_logprobs)
-        #advantages = tf.stop_gradient(advantages)
         loss = tf.maximum(-advantages * prob_ratio, -advantages * tf.clip_by_value(prob_ratio, 1 - clip_range, 1 + clip_range))
         loss = tf.reduce_mean(loss, axis=None)
         return loss
 
     def value_function_loss(self, values, returns):
-        #returns = tf.stop_gradient(returns)
         return tf.reduce_mean((values - returns)**2, axis=None)
 
     def entropy_loss(self, entropy):
         return tf.reduce_mean(entropy, axis=None)
 
     def collect_experiences(self, policy_state):
-
         last_time_step, last_policy_state = self.driver.run(policy_state=policy_state, maximum_iterations=self.horizon)
         last_observation, last_done = last_time_step.observation, tf.equal(last_time_step.step_type, StepType.LAST)
         last_observation, last_done = tf.expand_dims(last_observation, axis=1), tf.expand_dims(last_done, axis=1)
