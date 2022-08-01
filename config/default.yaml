@@ -1,6 +1,7 @@
 env:
   max_time_steps: 10000000
 model:
+  conv_net: false
   memory_size: 16
   name: default
   rnn_units: 64
@@ -14,7 +15,7 @@ ppo:
   gae_parameter: 0.95
   horizon: 128
   lr: 0.00025
-  num_actors: 8
+  num_actors: 16
   num_epochs: 3
-  num_minibatch: 4
+  num_minibatch: 8
   vf_coeff: 1.0

@@ -33,7 +33,7 @@ def main(args):
 
     now = datetime.datetime.now().timetuple()
     run_name = game_name + '_' + ''.join([str(t) for t in now])
-    wandb.init(project="recurrent-pg-atari", entity="prahtz", name=run_name)
+    
 
     
 
@@ -53,6 +53,7 @@ def main(args):
 
     share_params = cfg.model.share_params
     units = cfg.model.rnn_units
+    conv_net = cfg.model.conv_net
     use_rnn = cfg.model.use_rnn
     memory_size = cfg.model.memory_size
     model_name = cfg.model.name
@@ -71,31 +72,33 @@ def main(args):
         "share_params": share_params,
         "memory_size": memory_size
     }
+    wandb.init(project="recurrent-pg-atari", entity="prahtz", name=run_name, config=wandb.config)
 
     env_constructor = functools.partial(get_env, game_name)
 
     envs = [env_constructor for _ in range(num_workers)]
     env = TFPyEnvironment(ParallelPyEnvironment(env_constructors=envs))
     env.seed([args.seed]*num_workers)
+    action_spec = env.action_spec()
 
     if share_params:
         policy_state_spec = (tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16))
     else:
         policy_state_spec = ((tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)), 
                             (tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)))
-    info_spec = (tf.TensorSpec(shape=(env.action_spec().maximum), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
-
-    policy_encoder = AtariNetwork(use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
+    info_spec = (tf.TensorSpec(shape=(action_spec.maximum), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
+    
+    policy_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
     if share_params:
         value_encoder = None
     else:
-        value_encoder = AtariNetwork(use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
+        value_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
 
-    actor_critic_network = AtariActorCriticNetwork(n_actions=env.action_spec().maximum, 
+    actor_critic_network = AtariActorCriticNetwork(n_actions=action_spec.maximum, 
                                                    policy_encoder=policy_encoder, 
                                                    value_encoder=value_encoder)
     policy = AtariPolicy(time_step_spec=env.time_step_spec(), 
-                         action_spec=env.action_spec(), 
+                         action_spec=action_spec, 
                          policy_state_spec=policy_state_spec,
                          info_spec=info_spec,
                          actor_critic_network=actor_critic_network)
@@ -113,7 +116,7 @@ def main(args):
     else:
         learning_rate_fn = lr
         clipping_fn = lambda : clipping_parameter
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn, clipnorm=0.5)
     driver = DynamicStepDriver(env, policy=policy, num_steps=horizon*num_workers)
     
     agent = PPOAgent(num_workers, horizon, driver, policy)
