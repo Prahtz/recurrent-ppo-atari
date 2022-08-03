@@ -9,8 +9,7 @@ import random
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('game_name', help='Name of the Atari game')
-    parser.add_argument('cfg_path1', help='YAML file containing arguments and hyperparameters')
-    parser.add_argument('cfg_path2', help='YAML file containing arguments and hyperparameters')
+    parser.add_argument('cfg_paths', help='List of YAML files containing arguments and hyperparameters', nargs='+', default=[])
     parser.add_argument('--seed', help='Random seed, for reproducibility', default=42)
     parser.add_argument('--debug', help='If set, run in debug mode (no logs)', action='store_true')
     parser.add_argument('--render', help='If set, render experiences every 100 collections', action='store_true')
@@ -19,10 +18,11 @@ if __name__ == '__main__':
 
     assert 'SLURM_PROCID' in os.environ
     rank = int(os.environ['SLURM_PROCID'])
-    if rank == 0:
-        args.cfg_path = args.cfg_path1
-    else:
-        args.cfg_path = args.cfg_path2
+
+    cfg_paths = args.cfg_paths
+    assert len(cfg_paths) > rank
+
+    args.cfg_path = cfg_paths[rank]
 
     if args.debug:
         os.environ["WANDB_MODE"] = "offline"
