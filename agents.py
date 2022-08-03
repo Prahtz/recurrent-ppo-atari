@@ -113,8 +113,8 @@ class PPOAgent:
             print(f'episodic_return: {episodic_return}')
             for t in episodic_return.keys():
                 wandb.log({'step': t + collect_n*self.horizon, 'episodic_return':  episodic_return[t]})
-            if render and collect_n % 1 == 0:
-                utils.render_obs(experiences['observations'])
+            if render:
+                utils.render_obs(experiences['observations'], use_rnn)
 
             advantages = self.compute_advantages(discount, gae_parameter, experiences['rewards'], experiences['values'], experiences['dones'])
             returns = advantages + experiences['values'][:, :-1]

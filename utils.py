@@ -1,9 +1,9 @@
 import cv2 as cv
-def render_obs(obs):
+def render_obs(obs, use_rnn):
     cv.namedWindow('env0', cv.WINDOW_NORMAL)
     obs = obs[0]
     for i in range(obs.shape[0]):
-        frame = obs[i][:,:,3].numpy()
+        frame = obs[i].numpy() if use_rnn else obs[i][:,:,3].numpy()
         cv.imshow('env0', frame)
         cv.waitKey(delay=10)
 
