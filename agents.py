@@ -39,9 +39,7 @@ class PPOAgent:
         return [[ids[j][i] for j in range(self.num_workers)] for i in range(num_minibatch)]
 
     def ppo_clip_loss(self, advantages, old_logprobs, logprobs, clip_range):
-        #old_logprobs = tf.stop_gradient(old_logprobs)
         prob_ratio = tf.exp(logprobs - old_logprobs)
-        #advantages = tf.stop_gradient(advantages)
         loss = tf.maximum(-advantages * prob_ratio, -advantages * tf.clip_by_value(prob_ratio, 1 - clip_range, 1 + clip_range))
         loss = tf.reduce_mean(loss, axis=None)
         return loss
@@ -117,7 +115,7 @@ class PPOAgent:
             print(f'episodic_return: {episodic_return}')
             for t in episodic_return.keys():
                 wandb.log({'step': t + collect_n*self.horizon, 'episodic_return':  episodic_return[t]})
-            if render and collect_n % 1 == 0:
+            if render:
                 utils.render_obs(experiences['observations'])
 
             advantages = self.compute_advantages(discount, gae_parameter, experiences['rewards'], experiences['values'], experiences['dones'])

@@ -33,9 +33,6 @@ def main(args):
 
     now = datetime.datetime.now().timetuple()
     run_name = game_name + '_' + ''.join([str(t) for t in now])
-    
-
-    
 
     num_workers = cfg.ppo.num_actors
     max_time_steps = cfg.env.max_time_steps
@@ -69,6 +66,7 @@ def main(args):
         "vf_coeff": vf_coeff,
         "use_rnn": use_rnn,
         "rnn_units": units,
+        "conv_net": cfg.model.conv_net,
         "share_params": share_params,
         "memory_size": memory_size
     }
@@ -86,7 +84,7 @@ def main(args):
     else:
         policy_state_spec = ((tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)), 
                             (tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)))
-    info_spec = (tf.TensorSpec(shape=(action_spec.maximum), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
+    info_spec = (tf.TensorSpec(shape=(action_spec.maximum + 1), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
     
     policy_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
     if share_params:
@@ -94,7 +92,7 @@ def main(args):
     else:
         value_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
 
-    actor_critic_network = AtariActorCriticNetwork(n_actions=action_spec.maximum, 
+    actor_critic_network = AtariActorCriticNetwork(n_actions=action_spec.maximum + 1, 
                                                    policy_encoder=policy_encoder, 
                                                    value_encoder=value_encoder)
     policy = AtariPolicy(time_step_spec=env.time_step_spec(), 
@@ -133,13 +131,14 @@ def main(args):
                 render=render)
     
     model_path = game_name + '_' + model_name
+    os.makedirs('models/', exist_ok=True)
     policy.actor_critic_network.save_weights(f'models/{model_path}.h5')
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('game_name', help='Name of the Atari game')
     parser.add_argument('cfg_path', help='YAML file containing arguments and hyperparameters')
-    parser.add_argument('--seed', help='Random seed, for reproducibility', default=42)
+    parser.add_argument('--seed', help='Random seed, for reproducibility', default=42, type=int)
     parser.add_argument('--debug', help='If set, run in debug mode (no logs)', action='store_true')
     parser.add_argument('--render', help='If set, render experiences every 100 collections', action='store_true')
 

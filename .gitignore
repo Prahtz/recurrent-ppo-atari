@@ -2,3 +2,7 @@ env/
 __pycache__/
 wandb/
 models/
+config/
+
+!config/config.py
+!config/default.yaml
