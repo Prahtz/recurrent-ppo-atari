@@ -33,14 +33,17 @@ class ClipRewardsEnv(gym.RewardWrapper):
     def reward(self, reward):
         return np.sign(reward)
 
-def get_env(game_name, deterministic=False, clip_reward=True):
+def get_env(game_name, use_rnn, deterministic=False, clip_reward=True, ):
     env_name = f'{game_name}NoFrameskip-v4'
-    wrappers = [AtariPreprocessing, FrameStack4]
+    wrappers = [AtariPreprocessing]
 
     if clip_reward:
         wrappers.insert(0, ClipRewardsEnv)
 
     if not deterministic:
         wrappers.insert(0, NoopResetEnv)
+    
+    if not use_rnn:
+        wrappers.append(FrameStack4)
     env = suite_atari.load(env_name, gym_env_wrappers=wrappers)
     return env

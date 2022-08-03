@@ -29,7 +29,7 @@ def evaluate(args):
     memory_size = cfg.model.memory_size
     
     num_episodes = 128
-    env_constructor = functools.partial(get_env, game_name, True, False)
+    env_constructor = functools.partial(get_env, game_name, use_rnn, True, False)
     envs = [env_constructor for _ in range(num_envs)]
     env = TFPyEnvironment(ParallelPyEnvironment(env_constructors=envs))
 

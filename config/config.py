@@ -24,7 +24,7 @@ cfg.model.conv_net = False
 cfg.model.share_params = False
 cfg.model.use_rnn = False
 cfg.model.rnn_units = 64
-cfg.model.memory_size = 16
+cfg.model.memory_size = 4
 
 def get_cfg_defaults():
     """

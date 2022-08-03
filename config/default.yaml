@@ -2,7 +2,7 @@ env:
   max_time_steps: 10000000
 model:
   conv_net: false
-  memory_size: 16
+  memory_size: 4
   name: default
   rnn_units: 64
   share_params: false

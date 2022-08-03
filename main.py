@@ -32,7 +32,7 @@ def main(args):
     render = args.render
 
     now = datetime.datetime.now().timetuple()
-    run_name = game_name + '_' + ''.join([str(t) for t in now])
+    run_name = game_name + '_' + cfg_path.split('/')[-1].split('.')[0]
 
     num_workers = cfg.ppo.num_actors
     max_time_steps = cfg.env.max_time_steps
@@ -72,7 +72,7 @@ def main(args):
     }
     wandb.init(project="recurrent-pg-atari", entity="prahtz", name=run_name, config=wandb.config)
 
-    env_constructor = functools.partial(get_env, game_name)
+    env_constructor = functools.partial(get_env, game_name, use_rnn)
 
     envs = [env_constructor for _ in range(num_workers)]
     env = TFPyEnvironment(ParallelPyEnvironment(env_constructors=envs))
