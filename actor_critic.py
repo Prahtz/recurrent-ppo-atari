@@ -4,14 +4,45 @@ import numpy as np
 
 class AtariGRU(tf.keras.layers.Layer):
     def __init__(self, units, memory_size=16):
-        # RNN special layer, if episode ends or memory limit reached reset cell states
+        """
+        Special Keras GRU layer for Atari games having a maximum memory size. 
+        After 'memory_size' steps, this layer reset its internal state to the initial one
+
+        Parameters
+        ----------
+        units: int
+            The dimension of the hidden state vector of the GRU layer
+        memory_size: int
+            The maximum size of the internal memory of this custom layer
+        """
         super().__init__()
         self.units = units
         self.memory_size = memory_size
         weights_init = tf.keras.initializers.Orthogonal(gain=1.0)
         self.rnn = tf.keras.layers.GRU(units=units, stateful=False, return_state=True, return_sequences=True, kernel_initializer=weights_init)
     def call(self, inputs, dones, cell_states, training=True):
-        # inputs.shape = [batch_size, time_steps, units]
+        """
+        Compute the next hidden states given the input tensors, end of episodes and previous policy state. 
+        It overrides the Keras Layer's call method
+        
+        Parameters
+        ----------
+        inputs: tf.Tensor
+            Input tensor having size [batch_size, time_steps, V]
+        dones: tf.Tensor
+            End-of-episode tensor having size [batch_size, time_steps]
+        cell_states: tuple
+            Previous hidden states and current memory counters
+        training: bool
+            If True, accumulate gradients during the forward pass
+        Returns
+        ----------
+        sequences: tf.Tensor
+            New hidden states having size [batch_size, units]
+        policy_state: tuple
+            New policy state containing both new hidden states and memory counters
+        
+        """
         state, step = cell_states
         time_steps = inputs.shape[1]
         x_steps = tf.split(inputs, time_steps, axis=1)
@@ -35,6 +66,20 @@ class AtariGRU(tf.keras.layers.Layer):
             
 class AtariNetwork(tf.keras.Model):
     def __init__(self, conv_net=True, use_rnn=True, rnn_units=64, memory_size=16):
+        """
+        Atari neural network for encoding observations.
+
+        Parameters
+        ----------
+        conv_net: bool
+            If True, the network will encode frames using a CNN
+        use_rnn: bool
+            If True, the network will use an AtariGRU layer at the end of the encoding
+        rnn_units: int
+            Size of the hidden state vector of the AtariGRU layer
+        memory_size: int
+            Memory size of the AtariGRU layer
+        """
         super().__init__()
         self.use_rnn = use_rnn
         self.rnn_units = rnn_units
@@ -61,6 +106,28 @@ class AtariNetwork(tf.keras.Model):
             self.concat = tf.keras.layers.Concatenate(axis=2)
 
     def call(self, inputs, dones, cell_states=None, training=True):
+        """
+        Encode observations using given input frames, end of episodes and previous policy state. 
+        It overrides the Keras Layer's call method
+        
+        Parameters
+        ----------
+        inputs: tf.Tensor
+            Input tensor having size [batch_size, time_steps, 84, 84, n_frames]
+        dones: tf.Tensor
+            End-of-episode tensor having size [batch_size, time_steps]
+        cell_states: tuple
+            Previous hidden states and current memory counters
+        training: bool
+            If True, accumulate gradients during the forward pass
+
+        Returns
+        ----------
+        outputs: tf.Tensor
+            New hidden states having size [batch_size, units]
+        policy_state: tuple
+            New policy state containing both new hidden states and memory counters
+        """
         x = self.network(inputs, training=training)
         if self.use_rnn:
             y, cell_states = self.atari_rnn(inputs=x, dones=dones, cell_states=cell_states, training=training)
@@ -69,8 +136,19 @@ class AtariNetwork(tf.keras.Model):
 
 class AtariActorCriticNetwork(tf.keras.Model):
     def __init__(self, n_actions, policy_encoder, value_encoder=None):
+        """
+        Actor-critic network, it takes an AtariNetwork as observation encoder and then returns the policy distribution and the value function
+
+        Parameters
+        ----------
+        n_actions: int
+            Number of possible actions, it is the output shape of the actor network
+        policy_encoder: AtariNetwork
+            AtariNetwork for encoding observations for the policy network (also for value function if value_encoder=None)  
+        value_encoder:
+            If not None, it is an AtariNetwork for encoding observations for the value function.
+        """
         super().__init__()
-        #self.flat = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())
         self.policy_encoder = policy_encoder
 
         if value_encoder is None:
@@ -88,9 +166,37 @@ class AtariActorCriticNetwork(tf.keras.Model):
         self.memory_size = policy_encoder.memory_size
 
     def call(self, inputs, dones, cell_states=None, action=None, training=True):
-        inputs = tf.cast(inputs, tf.float32) / 255.0
-        #inputs = self.flat(inputs, training=training)
+        """
+        Computes the policy distribution and the value function.
 
+        Parameters
+        ----------
+        inputs: tf.Tensor
+            Input tensor having size [batch_size, time_steps, 84, 84, n_frames]
+        dones: tf.Tensor
+            End-of-episode tensor having size [batch_size, time_steps]
+        cell_states: tuple
+            Previous hidden states and current memory counters
+        action: None or tf.Tensor
+            If None, returns a sampled action and its probability, otherwise returns that action and its probability
+        training: bool
+            If True, accumulate gradients during the forward pass
+
+        Returns
+        ----------
+        action: tf.Tensor
+            Tensor representing the sampled/choosen action
+        log_prob: tf.Tensor
+            Tensor representing the log probability of the action
+        values: tf.Tensor
+            Tensor representing the value function result
+        entropy: tf.Tensor
+            Tensor representing the entropy of the distribution
+        new_cell_states: tuple
+            Tuple containing the new policy state
+        """
+
+        inputs = tf.cast(inputs, tf.float32) / 255.0
 
         policy_states = cell_states
         if self.shared_params:

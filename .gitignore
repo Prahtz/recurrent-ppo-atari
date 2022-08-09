@@ -3,6 +3,7 @@ __pycache__/
 wandb/
 models/
 config/
+results/
 
 !config/config.py
 !config/default.yaml

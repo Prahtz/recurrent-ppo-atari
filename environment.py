@@ -7,12 +7,15 @@ import numpy as np
 
 class NoopResetEnv(gym.Wrapper):
     def __init__(self, env):
+        """
+        Performs N no-op actions every time the evironment is reset.
+        N is sampled uniformly in range (0, 30)
+        """
         super(NoopResetEnv, self).__init__(env)
         self._env = env
         self.no_ops_range = (0, 30)
 
     def __getattr__(self, name):
-        """Forward all other calls to the base environment."""
         return getattr(self._env, name)
 
     def reset(self):
@@ -26,8 +29,10 @@ class NoopResetEnv(gym.Wrapper):
         return self._env.step(action)
 
 class ClipRewardsEnv(gym.RewardWrapper):
-    # Clip rewards in range [-1, 0, 1]
     def __init__(self, env):
+        """
+        Clip rewards in range [-1, 0, 1]
+        """
         super(ClipRewardsEnv, self).__init__(env)
 
     def reward(self, reward):

@@ -17,7 +17,6 @@ from actor_critic import AtariActorCriticNetwork, AtariNetwork
 from atari_policy import AtariPolicy
 
 import wandb
-import datetime
 
 import utils
 
@@ -31,7 +30,6 @@ def main(args):
     game_name = args.game_name
     render = args.render
 
-    now = datetime.datetime.now().timetuple()
     run_name = game_name + '_' + cfg_path.split('/')[-1].split('.')[0]
 
     num_workers = cfg.ppo.num_actors
@@ -70,7 +68,7 @@ def main(args):
         "share_params": share_params,
         "memory_size": memory_size
     }
-    wandb.init(project="recurrent-pg-atari", entity="prahtz", name=run_name, config=wandb.config)
+    wandb.init(project="recurrent-ppo-atari", entity="prahtz", name=run_name, config=wandb.config)
 
     env_constructor = functools.partial(get_env, game_name, use_rnn)
 

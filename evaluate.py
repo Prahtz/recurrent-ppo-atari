@@ -9,6 +9,8 @@ from tf_agents.trajectories import StepType
 import tensorflow as tf
 import functools
 import tf_agents
+import wandb
+from tqdm import tqdm
 
 def evaluate(args):
     args = args[0]
@@ -19,8 +21,18 @@ def evaluate(args):
 
     game_name = args.game_name
     checkpoint_path = args.checkpoint_path
+    run_name = game_name + '_' + cfg_path.split('/')[-1].split('.')[0]
+    api = wandb.Api()
+    runs = api.runs('prahtz/recurrent-ppo-atari')
 
-    num_envs = cfg.ppo.num_actors 
+    average_episodic_return = None
+    for c_run in runs:
+        if c_run.name == run_name:
+            samples = c_run.scan_history(keys=['episodic_return'])
+            episodic_returns = [sample['episodic_return'] for sample in samples][-100:]
+            average_episodic_return = sum(episodic_returns) / len(episodic_returns)
+            break
+    assert average_episodic_return is not None
 
     share_params = cfg.model.share_params
     units = cfg.model.rnn_units
@@ -28,7 +40,8 @@ def evaluate(args):
     use_rnn = cfg.model.use_rnn
     memory_size = cfg.model.memory_size
     
-    num_episodes = 128
+    num_episodes = 100
+    num_envs = 10
     env_constructor = functools.partial(get_env, game_name, use_rnn, True, False)
     envs = [env_constructor for _ in range(num_envs)]
     env = TFPyEnvironment(ParallelPyEnvironment(env_constructors=envs))
@@ -40,7 +53,7 @@ def evaluate(args):
     else:
         policy_state_spec = ((tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)), 
                             (tf.TensorSpec(shape=(units), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.int16)))
-    info_spec = (tf.TensorSpec(shape=(action_spec.maximum), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
+    info_spec = (tf.TensorSpec(shape=(action_spec.maximum + 1), dtype=tf.float32), tf.TensorSpec(shape=(1), dtype=tf.float32))
 
     policy_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
     if share_params:
@@ -48,7 +61,7 @@ def evaluate(args):
     else:
         value_encoder = AtariNetwork(conv_net=conv_net, use_rnn=use_rnn, rnn_units=units, memory_size=memory_size)
 
-    actor_critic_network = AtariActorCriticNetwork(n_actions=action_spec.maximum, 
+    actor_critic_network = AtariActorCriticNetwork(n_actions=action_spec.maximum + 1, 
                                                    policy_encoder=policy_encoder, 
                                                    value_encoder=value_encoder)
 
@@ -65,9 +78,7 @@ def evaluate(args):
 
     assert num_episodes % num_envs == 0
     results = []
-    while num_episodes > 0:
-        num_episodes -= num_envs
-
+    for _ in tqdm(range(0, num_episodes, num_envs)):
         memory = []
         driver = DynamicEpisodeDriver(env, policy, observers=[memory.append], num_episodes=num_envs)
         last_time_step, _ = driver.run()
@@ -88,8 +99,10 @@ def evaluate(args):
         memory.clear()
             
 
-    average_episodic_return = sum(results) / len(results)
-    print('Average episodic return:', average_episodic_return.numpy().item())
+    real_average_episodic_return = sum(results) / len(results)
+    real_average_episodic_return = real_average_episodic_return.numpy().item()
+    with open('results/out.txt', 'a') as f_out:
+        f_out.write(f'{run_name} avg_ep_rtn: {average_episodic_return} - real_avg_ep_rtn: {real_average_episodic_return}\n')
 
     
             
