@@ -11,6 +11,7 @@ import functools
 import tf_agents
 import wandb
 from tqdm import tqdm
+import os
 
 def evaluate(args):
     args = args[0]
@@ -101,6 +102,7 @@ def evaluate(args):
 
     real_average_episodic_return = sum(results) / len(results)
     real_average_episodic_return = real_average_episodic_return.numpy().item()
+    os.makedirs('results/', exist_ok=True)
     with open('results/out.txt', 'a') as f_out:
         f_out.write(f'{run_name} avg_ep_rtn: {average_episodic_return} - real_avg_ep_rtn: {real_average_episodic_return}\n')
 
