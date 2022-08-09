@@ -19,20 +19,20 @@ The algorithm used in this work to solve Atari games is PPO, one of the state-of
 In the PPO paper, the authors introduced a simple deep network used to approximate the policy. Another aim of this project is to test that architecture and see if we obtain the same results reported in the paper.
 
 ## Requirements
-The code has been tested with python 3.10 and requires the libraries listed in requirements.txt:
+The code has been tested with python 3.10 and requires the libraries listed in `requirements.txt`.
 
 **Install Modules:** 
 
 ```sh
-  pip install -U pip
   pip install -r requirements.txt
 ```
+This work relies on `wandb` library for logging results, so you need also to run `wandb login` before running any script.
 ## Usage
 To run the algorithm, simply run
 ```
 python main.py <game_name> <cfg_path>
 ```
-Where `<game_name>` must be an Atari game prefix name (list here) while `<cfg_path>` must be the path of a YAML file containing 
+where `<game_name>` must be the [name](https://www.gymlibrary.ml/environments/atari/complete_list/) of one Atari game, `<cfg_path>` must be the path of a YAML file containing 
 the algorithm's hyperparameters, following the structure described in `config/default.yaml`.
 
 After training is finished, in `models/` you can find the actor-critic network's weights. You can evaluate the final model by running
@@ -42,3 +42,5 @@ python evaluate.py <game_name> <cfg_path> <checkpoint_path>
 where `<checkpoint_path>` is the path of the file containing the actor-critic network's weights.
 
 If you want additional information, simply run `main.py` or `evaulate.py` adding `--help` as argument.
+
+**Note** that if you want to run your own training configuration, you must also declare your `wandb` entity and project name in the configuration file.

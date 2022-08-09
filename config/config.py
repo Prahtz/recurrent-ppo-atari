@@ -2,6 +2,10 @@ from yacs.config import CfgNode as CN
 
 cfg = CN()
 
+cfg.wandb = CN()
+cfg.wandb.entity = "prahtz"
+cfg.wandb.project = "recurrent-ppo-atari"
+
 cfg.env = CN()
 cfg.env.max_time_steps = 10_000_000
 

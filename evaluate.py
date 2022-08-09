@@ -23,8 +23,18 @@ def evaluate(args):
     game_name = args.game_name
     checkpoint_path = args.checkpoint_path
     run_name = game_name + '_' + cfg_path.split('/')[-1].split('.')[0]
+
+    share_params = cfg.model.share_params
+    units = cfg.model.rnn_units
+    conv_net = cfg.model.conv_net
+    use_rnn = cfg.model.use_rnn
+    memory_size = cfg.model.memory_size
+
+    entity = cfg.wandb.entity
+    project = cfg.wandb.project
+
     api = wandb.Api()
-    runs = api.runs('prahtz/recurrent-ppo-atari')
+    runs = api.runs(f'{entity}/{project}')
 
     average_episodic_return = None
     for c_run in runs:
@@ -34,12 +44,6 @@ def evaluate(args):
             average_episodic_return = sum(episodic_returns) / len(episodic_returns)
             break
     assert average_episodic_return is not None
-
-    share_params = cfg.model.share_params
-    units = cfg.model.rnn_units
-    conv_net = cfg.model.conv_net
-    use_rnn = cfg.model.use_rnn
-    memory_size = cfg.model.memory_size
     
     num_episodes = 100
     num_envs = 10

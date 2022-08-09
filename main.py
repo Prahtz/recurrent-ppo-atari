@@ -53,6 +53,9 @@ def main(args):
     memory_size = cfg.model.memory_size
     model_name = cfg.model.name
 
+    entity = cfg.wandb.entity
+    project = cfg.wandb.project
+
     n_collections = max_time_steps // (num_workers*horizon)
     
     wandb.config = {
@@ -68,7 +71,7 @@ def main(args):
         "share_params": share_params,
         "memory_size": memory_size
     }
-    wandb.init(project="recurrent-ppo-atari", entity="prahtz", name=run_name, config=wandb.config)
+    wandb.init(project=project, entity=entity, name=run_name, config=wandb.config)
 
     env_constructor = functools.partial(get_env, game_name, use_rnn)
 

@@ -19,3 +19,6 @@ ppo:
   num_epochs: 3
   num_minibatch: 8
   vf_coeff: 1.0
+wandb:
+  entity: prahtz
+  project: recurrent-ppo-atari
